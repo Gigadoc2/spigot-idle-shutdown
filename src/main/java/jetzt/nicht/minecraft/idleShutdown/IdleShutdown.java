@@ -29,6 +29,11 @@ public class IdleShutdown extends JavaPlugin {
 
 	@Override
 	public void onDisable() {
+		// Cancel the timer and unregister all Listeners
+		if (this.idleTimer != null) {
+			this.idleTimer.cancel();
+		}
+		HandlerList.unregisterAll(this);
 	}
 
 	public void onTimerExpired() {
