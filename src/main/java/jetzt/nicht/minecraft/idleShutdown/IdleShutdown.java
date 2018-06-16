@@ -28,8 +28,11 @@ public class IdleShutdown extends JavaPlugin {
 
 		// Run the playerQuit routine once. We might have been enabled at
 		// runtime, or the server was started automatically without anyone
-		// actually joining.
-		onPlayerQuit();
+		// actually joining. TODO: Make this configurable.
+		if (noPlayerOnline()) {
+			System.out.println("There are no players online!");
+			startIdleTimer();
+		}
 	}
 
 	@Override
@@ -42,19 +45,26 @@ public class IdleShutdown extends JavaPlugin {
 	}
 
 	public void onTimerExpired() {
-		System.out.println("Timer expired, shutting down server!");
+		System.out.println("Timer expired!");
 
-		// Unregister all our Listeners, just to be on the safe side.
-		HandlerList.unregisterAll(this);
+		if(noPlayerOnline()) {
+			System.out.println("No players online, shutting down");
 
-		getServer().shutdown();
+			// Unregister all our Listeners, just to be on the safe side.
+			HandlerList.unregisterAll(this);
+
+			getServer().shutdown();
+		} else {
+			System.out.println("WARNING: A player has come online and we have "
+					+ "not been notified! Something is very wrong here!");
+		}
 	}
 
 	void onPlayerQuit() {
 		System.out.println("A player has quit!");
 
-		if (noPlayersOnline()) {
-			System.out.println("No players are online anymore!");
+		if (lastPlayerOnline()) {
+			System.out.println("The last player is leaving!");
 
 			// We now register PlayerJoinListener, so we can abort the timer
 			// if a player joins in the meantime
@@ -65,15 +75,7 @@ public class IdleShutdown extends JavaPlugin {
 			getServer().getPluginManager()
 				.registerEvents(this.playerJoinListener, this);
 
-			System.out.println("Creating and scheduling timer...");
-			this.idleTimer = new Timer();
-			TimerTask idleTimerTask = new TimerTask() {
-				@Override
-				public void run() {
-					onTimerExpired();
-				}
-			};
-			this.idleTimer.schedule(idleTimerTask, 30*1000);
+			startIdleTimer();
 		}
 	}
 
@@ -89,14 +91,33 @@ public class IdleShutdown extends JavaPlugin {
 		this.idleTimer.cancel();
 	}
 
-	private boolean noPlayersOnline() {
-		// Note: The event gets fired before the player is acutally reported as
-		// "offline", so we just say there is no one online if the last player
-		// is in the process of quitting.
+	private boolean lastPlayerOnline() {
+		// Note: When the PlayerQuit event is fired, the player is technically
+		// still online. Thus, we check if it is the last player leaving.
 		if (getServer().getOnlinePlayers().size() <= 1) {
 			return true;
 		} else {
 			return false;
 		}
+	}
+
+	private boolean noPlayerOnline() {
+		if (getServer().getOnlinePlayers().size() <= 0) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private void startIdleTimer() {
+		System.out.println("Creating and scheduling timer...");
+		this.idleTimer = new Timer();
+		TimerTask idleTimerTask = new TimerTask() {
+			@Override
+			public void run() {
+				onTimerExpired();
+			}
+		};
+		this.idleTimer.schedule(idleTimerTask, 30*1000);
 	}
 }
