@@ -25,6 +25,11 @@ public class IdleShutdown extends JavaPlugin {
 		System.out.println("Registering PlayerQuitListener...");
 		getServer().getPluginManager()
 			.registerEvents(this.playerQuitListener, this);
+
+		// Run the playerQuit routine once. We might have been enabled at
+		// runtime, or the server was started automatically without anyone
+		// actually joining.
+		onPlayerQuit();
 	}
 
 	@Override
