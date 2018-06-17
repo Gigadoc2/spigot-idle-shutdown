@@ -1,0 +1,5 @@
+---
+# After the last player left, how long should the server wait before
+# shutting down? Time in seconds.
+# This is not influenced by the servers tick rate.
+idle_wait_time: 30

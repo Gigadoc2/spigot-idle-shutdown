@@ -1,7 +1,8 @@
 ---
 name: IdleShutdown
+website: https://git.revreso.de/gigadoc2/spigot-idle-shutdown
 description: Shut down spigot when no one is online.
 author: Gigadoc2
-version: 0.1.0
+version: 1.0.0
 
 main: jetzt.nicht.minecraft.idleShutdown.IdleShutdown

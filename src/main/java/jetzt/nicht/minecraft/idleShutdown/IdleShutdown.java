@@ -1,5 +1,6 @@
 package jetzt.nicht.minecraft.idleShutdown;
 
+import java.util.logging.Logger;
 import java.util.Timer;
 import java.util.TimerTask;
 import org.bukkit.event.HandlerList;
@@ -10,19 +11,38 @@ import jetzt.nicht.minecraft.idleShutdown.PlayerQuitListener;
 import jetzt.nicht.minecraft.idleShutdown.PlayerJoinListener;
 
 public class IdleShutdown extends JavaPlugin {
-	PlayerQuitListener playerQuitListener;
-	PlayerJoinListener playerJoinListener;
-	Timer idleTimer;
+	private Logger log;
+	private Integer idleWaitTime;
+	private PlayerQuitListener playerQuitListener;
+	private PlayerJoinListener playerJoinListener;
+	private Timer idleTimer;
 
 	@Override
 	public void onEnable() {
+		// First of all, get the logger
+		this.log = getLogger();
+
+		// Write the default config, if it does not exist.
+		saveDefaultConfig();
+		// Get the current config, default or otherwise.
+		this.idleWaitTime = getConfig().getInt("idle_wait_time");
+		// Negative times are not supported (duh).
+		if (this.idleWaitTime < 0) {
+			log.warning("You cannot use a negative idle_wait_time! Time set to 0 seconds.");
+			this.idleWaitTime = 0;
+		}
+		// Let the admin know the configured idle time.
+		log.info(String.format(("This server is running IdleShutdown: " +
+					"It will stop after %d seconds with no player online."),
+					this.idleWaitTime));
+
 		// Create our listeners once, assign them later.
 		// We pass in a reference to ourselves so the listener can call back.
 		this.playerQuitListener = new PlayerQuitListener(this);
 		this.playerJoinListener = new PlayerJoinListener(this);
 
 		// Register our listener that listens for players quitting.
-		System.out.println("Registering PlayerQuitListener...");
+		log.finer("Registering PlayerQuitListener...");
 		getServer().getPluginManager()
 			.registerEvents(this.playerQuitListener, this);
 
@@ -30,7 +50,7 @@ public class IdleShutdown extends JavaPlugin {
 		// runtime, or the server was started automatically without anyone
 		// actually joining. TODO: Make this configurable.
 		if (noPlayerOnline()) {
-			System.out.println("There are no players online!");
+			log.fine("There are no players online!");
 			startIdleTimer();
 		}
 	}
@@ -39,55 +59,46 @@ public class IdleShutdown extends JavaPlugin {
 	public void onDisable() {
 		// Cancel the timer and unregister all Listeners
 		if (this.idleTimer != null) {
+			log.finer("Cancelling timer...");
 			this.idleTimer.cancel();
 		}
 		HandlerList.unregisterAll(this);
 	}
 
 	public void onTimerExpired() {
-		System.out.println("Timer expired!");
+		log.fine("Timer expired!");
 
 		if(noPlayerOnline()) {
-			System.out.println("No players online, shutting down");
+			log.info("No players online, shutting down");
 
 			// Unregister all our Listeners, just to be on the safe side.
 			HandlerList.unregisterAll(this);
 
 			getServer().shutdown();
 		} else {
-			System.out.println("WARNING: A player has come online and we have "
+			log.warning("A player has come online and we have "
 					+ "not been notified! Something is very wrong here!");
 		}
 	}
 
 	void onPlayerQuit() {
-		System.out.println("A player has quit!");
+		log.fine("A player has quit!");
 
 		if (lastPlayerOnline()) {
-			System.out.println("The last player is leaving!");
-
-			// We now register PlayerJoinListener, so we can abort the timer
-			// if a player joins in the meantime
-			// XXX: This might be racy: if the Listener is activated before we
-			// set the timer, we might crash when trying to abort the timer not
-			// yet running!
-			System.out.println("Registering PlayerJoinListener...");
-			getServer().getPluginManager()
-				.registerEvents(this.playerJoinListener, this);
-
+			log.info("The last player is leaving!");
 			startIdleTimer();
 		}
 	}
 
 	void onPlayerJoin() {
-		System.out.println("A player has joined!");
+		log.fine("A player has joined!");
 
 		// XXX: This might also be racy, if a player quits and joins after we
 		// unregister the Listener but before we abort the timer.
-		System.out.println("Unregistering PlayerJoinListener...");
+		log.finer("Unregistering PlayerJoinListener...");
 		HandlerList.unregisterAll(this.playerJoinListener);
 		
-		System.out.println("Aborting timer...");
+		log.finer("Aborting timer...");
 		this.idleTimer.cancel();
 	}
 
@@ -110,14 +121,28 @@ public class IdleShutdown extends JavaPlugin {
 	}
 
 	private void startIdleTimer() {
-		System.out.println("Creating and scheduling timer...");
-		this.idleTimer = new Timer();
-		TimerTask idleTimerTask = new TimerTask() {
-			@Override
-			public void run() {
-				onTimerExpired();
-			}
-		};
-		this.idleTimer.schedule(idleTimerTask, 30*1000);
+		if (this.idleWaitTime == 0) {
+			log.fine("idle_wait_time is 0, not scheduling timer!");
+			onTimerExpired();
+		} else {
+			// We now register PlayerJoinListener, so we can abort the timer
+			// if a player joins in the meantime
+			// XXX: This might be racy: if the Listener is activated before we
+			// set the timer, we might crash when trying to abort the timer not
+			// yet running!
+			log.finer("Registering PlayerJoinListener...");
+			getServer().getPluginManager()
+				.registerEvents(this.playerJoinListener, this);
+
+			log.finer("Creating and scheduling timer...");
+			this.idleTimer = new Timer();
+			TimerTask idleTimerTask = new TimerTask() {
+				@Override
+				public void run() {
+					onTimerExpired();
+				}
+			};
+			this.idleTimer.schedule(idleTimerTask, this.idleWaitTime*1000);
+		}
 	}
 }
